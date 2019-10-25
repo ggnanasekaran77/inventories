@@ -1,0 +1,71 @@
+#!/usr/bin/env groovy
+
+node {
+    stage ("Checkout") {
+        git url: 'ssh://git@git.com/ggnanasekaran77/inventories.git', credentialsId: 'git-ci'
+    }
+    stage ("Seed Job") {
+            def jobList = sh (script: 'git ls-tree --full-tree -r --name-only HEAD | egrep -v "Jenkinsfile|.gitignore|/web/" | cut -d/ -f1-2 | sort -u', returnStdout: 'True').trim().split('\n')
+            jobList.each {
+                def (projectName, appName) = it.tokenize('/')
+                println projectName + " " +  appName
+                jobDsl scriptText: """
+                    folder ("${projectName}") {
+                        displayName("${projectName}")
+                        description("Project ${projectName}")
+                    }
+                    multibranchPipelineJob("${projectName}/${appName}") {
+                        branchSources {
+                            branchSource {
+                                source {
+                                    displayName("${appName}")
+                                    bitbucketSCMSource {
+                                    serverUrl("https://git.com")
+                                    credentialsId("git-ci")
+                                    repoOwner("CICD")
+                                    repository("${projectName}-${appName}")
+                                    traits {
+                                        headWildcardFilter {
+                                        includes("*")
+                                        excludes("master")
+                                        }
+                                    }
+                                }
+                            }
+                                strategy {
+                                    defaultBranchPropertyStrategy {
+                                        props {
+                                            buildRetentionBranchProperty {
+                                                buildDiscarder {
+                                                    logRotator {
+                                                        daysToKeepStr("-1")
+                                                        numToKeepStr("30")
+                                                        artifactDaysToKeepStr("-1")
+                                                        artifactNumToKeepStr("-1")
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // Branch behaviour
+                        configure {
+                            def traits = it / sources / data / 'jenkins.branch.BranchSource' / source / traits
+                            traits << 'com.cloudbees.jenkins.plugins.bitbucket.BranchDiscoveryTrait' {
+                                strategyId(3) // detect all branches -refer the plugin source code for various options
+                            }
+                        }
+                        orphanedItemStrategy {
+                            discardOldItems {
+                                numToKeep(30)
+                            }
+
+                        }
+                    }
+                """
+            }
+    }
+}
+
