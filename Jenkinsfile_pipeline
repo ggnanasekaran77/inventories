@@ -1,0 +1,43 @@
+#!/usr/bin/env groovy
+
+node {
+    stage ("Checkout") {
+        git url: 'ssh://git@github.com/ggnanasekaran77/inventories.git', credentialsId: 'github-cicd'
+    }
+    stage ("Seed Job") {
+            def jobList = sh (script: 'git ls-tree --full-tree -r --name-only HEAD | egrep -v "Jenkinsfile|.gitignore|/web/"', returnStdout: 'True').trim().split('\n')
+            jobList.each {
+                def (projectName, appName, jobName) = it.tokenize('/')
+                println projectName + " " +  appName + " " + jobName
+                jobDsl scriptText: """
+                    folder ("${projectName}") {
+                        displayName("${projectName}")
+                        description("Project ${projectName}")
+                    }
+                    folder ("${projectName}/${appName}") {
+                        displayName("${appName}")
+                        description("Application ${appName}")
+                     }
+                    pipelineJob("${projectName}/${appName}/${jobName}") {
+                    triggers {
+                        bitbucketPush()
+                        scm("")
+                    }
+                    definition {
+                        cpsScm {
+                            scm {
+                                git {
+                                    remote {
+                                        url("ssh://git@git.rakuten-it.com:7999/cicd/${projectName}-${appName}.git")
+                                        credentials("rbitbucket-ssh")
+                                    }
+                                branch("*/${jobName}")
+                                }
+                            }
+                            lightweight()
+                        }
+                    }
+                } """
+            }
+    }
+}
