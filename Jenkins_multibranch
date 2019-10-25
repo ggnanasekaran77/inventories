@@ -2,7 +2,7 @@
 
 node {
     stage ("Checkout") {
-        git url: 'ssh://git@git.com/ggnanasekaran77/inventories.git', credentialsId: 'git-ci'
+        git url: 'ssh://git@git.com:7999/ggnanasekaran77/inventories.git', credentialsId: 'git-cicd'
     }
     stage ("Seed Job") {
             def jobList = sh (script: 'git ls-tree --full-tree -r --name-only HEAD | egrep -v "Jenkinsfile|.gitignore|/web/" | cut -d/ -f1-2 | sort -u', returnStdout: 'True').trim().split('\n')
